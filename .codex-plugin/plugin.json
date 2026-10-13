@@ -1,0 +1,7 @@
+{
+  "name": "did-stuff",
+  "version": "0.1.0",
+  "description": "You did stuff. Here’s what.",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}

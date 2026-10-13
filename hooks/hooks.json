@@ -1,0 +1,9 @@
+{
+  "description": "Did Stuff optional project capture and local recaps. Enable per project and review in /hooks.",
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"$PLUGIN_ROOT/skills/did-stuff/scripts/runtime/hook.js\"", "timeout": 3 }] }],
+    "PostToolUse": [{ "matcher": "^Bash$", "hooks": [{ "type": "command", "command": "node \"$PLUGIN_ROOT/skills/did-stuff/scripts/runtime/hook.js\"", "timeout": 3 }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node \"$PLUGIN_ROOT/skills/did-stuff/scripts/runtime/hook.js\"", "timeout": 3 }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "node \"$PLUGIN_ROOT/skills/did-stuff/scripts/runtime/hook.js\"", "timeout": 1 }] }]
+  }
+}

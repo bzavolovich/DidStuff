@@ -1,0 +1,18 @@
+{
+  "name": "did-stuff",
+  "version": "0.1.0",
+  "description": "You did stuff. Here’s what. Local work recaps for Codex.",
+  "type": "module",
+  "bin": { "did-stuff": "dist/cli.js" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc && node scripts/bundle.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "check": "tsc --noEmit",
+    "prepack": "npm run build"
+  },
+  "files": ["dist", "skills", "hooks", ".codex-plugin", ".agents/plugins", "README.md", "LICENSE", "CHANGELOG.md", "docs"],
+  "repository": { "type": "git", "url": "https://github.com/bzavolovich/DidStuff.git" },
+  "license": "MIT",
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.3" }
+}

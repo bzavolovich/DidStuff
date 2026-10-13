@@ -1,0 +1,6 @@
+interface:
+  display_name: "Did Stuff"
+  short_description: "Turn captured work into recaps, standups, and drafts"
+  default_prompt: "Use $did-stuff to summarize today’s captured work."
+policy:
+  allow_implicit_invocation: true
