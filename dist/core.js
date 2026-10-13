@@ -86,13 +86,15 @@ export function atomicWrite(file, content, exclusive = false) {
 }
 export function jsonRead(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 export function defaultConfig() {
-    return { schemaVersion: 1, automaticCapture: false, automaticRecap: false,
+    return { schemaVersion: 1, automaticCapture: false, automaticRecap: false, historyImport: true,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: 'English', outputDirectory: '.did-stuff/drafts' };
 }
 export function validateConfig(value) {
-    const c = value;
+    const c = { ...value };
+    if (!Object.hasOwn(c, 'historyImport'))
+        c.historyImport = true;
     if (!c || c.schemaVersion !== 1 || typeof c.automaticCapture !== 'boolean' || typeof c.automaticRecap !== 'boolean'
-        || typeof c.timezone !== 'string' || typeof c.language !== 'string' || !c.language.trim()
+        || typeof c.historyImport !== 'boolean' || typeof c.timezone !== 'string' || typeof c.language !== 'string' || !c.language.trim()
         || typeof c.outputDirectory !== 'string')
         throw new Error('Invalid configuration');
     new Intl.DateTimeFormat('en', { timeZone: c.timezone });
@@ -188,7 +190,7 @@ export function validActivity(a, root) {
         && typeof e.id === 'string' && /^[a-f0-9]{64}$/.test(e.id) && typeof e.sessionId === 'string'
         && ['assistant', 'tool', 'request'].includes(e.kind) && ['reported', 'observed', 'failed', 'request'].includes(e.outcome)
         && typeof e.description === 'string' && e.description.length <= 6000 && Array.isArray(e.evidence)
-        && e.evidence.every(x => typeof x === 'string') && ['activity', 'capture'].includes(e.timeBasis)
+        && e.evidence.every(x => typeof x === 'string') && ['activity', 'capture', 'turn'].includes(e.timeBasis)
         && Number.isFinite(Date.parse(e.activityAt)) && Number.isFinite(Date.parse(e.capturedAt));
 }
 export function readActivities(root, deadline = Infinity) {

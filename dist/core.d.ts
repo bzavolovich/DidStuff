@@ -10,8 +10,9 @@ export interface Activity {
     turnId?: string;
     activityAt: string;
     capturedAt: string;
-    timeBasis: 'activity' | 'capture';
+    timeBasis: 'activity' | 'capture' | 'turn';
     kind: 'assistant' | 'request' | 'tool';
+    origin?: 'history';
     description: string;
     evidence: string[];
     outcome: Outcome;
@@ -20,6 +21,7 @@ export interface Config {
     schemaVersion: 1;
     automaticCapture: boolean;
     automaticRecap: boolean;
+    historyImport: boolean;
     timezone: string;
     language: string;
     outputDirectory: string;

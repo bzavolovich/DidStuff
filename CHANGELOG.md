@@ -1,3 +1,11 @@
+# Unreleased
+
+- Import historical local Codex sessions, including archived sessions, through read-only app-server methods.
+- Sync project history automatically before evidence gathering and deterministic rendering, with an explicit `history` backfill command and opt-out setting.
+- Preserve original turn dates, deduplicate repeated imports and hook overlap, and report unavailable or partial history without discarding captured evidence.
+- Exclude generated summaries, hidden reasoning, undated/active turns and copied fork history; keep unrelated project contents out of imports.
+- Narrow summary-request detection so development tasks quoting Did Stuff usage remain eligible activity.
+
 # v0.1.0 — 2026-10-13
 
 First working Codex release of Did Stuff: “You did stuff. Here’s what.”

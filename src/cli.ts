@@ -2,10 +2,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { config, projectId, projectRoot, readActivities } from './core.js';
+import { config, periodDate, projectId, projectRoot, readActivities } from './core.js';
 import { captureHook, captureVisible } from './codex.js';
 import { evidenceBundle, formatName, renderAutomatic, saveExit, saveManual } from './drafts.js';
 import { initialize, install, uninstall } from './install.js';
+import { readHistoryReport, syncHistory } from './history.js';
 
 const args = process.argv.slice(2);
 function option(name: string): string | undefined { const index = args.indexOf(name); if (index < 0) return undefined; if (!args[index+1]) throw new Error(`Missing ${name} value`); return args[index+1]; }
@@ -16,6 +17,10 @@ function booleanOption(name: string): boolean | undefined {
 }
 function input(): unknown { return JSON.parse(fs.readFileSync(option('--from') ?? 0, 'utf8')); }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
+function evidencePeriod(root: string): string {
+  const period = option('--period') ?? 'today';
+  return period === 'session' ? period : periodDate(period, config(root).timezone);
+}
 try {
   const root = projectRoot(option('--project') ?? process.cwd());
   const command = args[0] ?? 'help';
@@ -29,6 +34,7 @@ try {
     case 'disable': output(initialize(root, { automaticCapture: false, automaticRecap: false })); break;
     case 'configure': output(initialize(root, { ...changes,
       ...(booleanOption('--capture') !== undefined ? { automaticCapture: booleanOption('--capture')! } : {}),
+      ...(booleanOption('--history') !== undefined ? { historyImport: booleanOption('--history')! } : {}),
       ...(booleanOption('--exit-recap') !== undefined ? { automaticRecap: booleanOption('--exit-recap')! } : {}) })); break;
     case 'config': output({ project: root, projectId: projectId(root), storage: path.join(root, '.did-stuff'), config: config(root) }); break;
     case 'doctor': {
@@ -38,7 +44,8 @@ try {
         activityRecords: read.activities.length, invalidRecords: read.invalid, readLimited: read.limited,
         skillInstalled: fs.existsSync(path.join(root, '.agents/skills/did-stuff/SKILL.md')),
         hooksFile: fs.existsSync(path.join(root, '.codex/hooks.json')), hookTrust: 'Inspect /hooks inside Codex; this helper cannot grant or confirm trust.',
-        diagnostics: path.join(root, '.did-stuff/diagnostics'), historyImport: 'Not implemented; no transcript parsing.' }); break;
+        diagnostics: path.join(root, '.did-stuff/diagnostics'), historyImport: { enabled: config(root).historyImport,
+          transport: 'Local Codex app-server thread/list and thread/read', lastSync: readHistoryReport(root) ?? null } }); break;
     }
     case 'capture': output({ captured: captureHook(root, input()) }); break;
     case 'record': {
@@ -47,15 +54,33 @@ try {
       if (!session) throw new Error('Pass --session with the actual current session identity');
       output({ captured: captureVisible(root, input(), session) }); break;
     }
-    case 'evidence': output(evidenceBundle(root, formatName(option('--format') ?? 'recap'), option('--period') ?? 'today', option('--session') ?? process.env.CODEX_THREAD_ID)); break;
+    case 'history': {
+      initialize(root);
+      const report = await syncHistory(root, option('--period') ?? 'all', option('--session') ?? process.env.CODEX_THREAD_ID);
+      output(report); if (report.status === 'unavailable' || report.status === 'partial') process.exitCode = 1; break;
+    }
+    case 'evidence': {
+      const format = formatName(option('--format') ?? 'recap');
+      const period = evidencePeriod(root); const session = option('--session') ?? process.env.CODEX_THREAD_ID;
+      initialize(root);
+      const history = config(root).historyImport && !args.includes('--no-history') ? await syncHistory(root, period, session) : undefined;
+      const bundle = evidenceBundle(root, format, history?.period ?? period, session);
+      if (args.includes('--no-history')) bundle.limitations.push('History sync was skipped for this invocation (--no-history).');
+      output({ ...bundle, history: history ?? { status: 'disabled' } }); break;
+    }
     case 'save': output(saveManual(root, input())); break;
-    case 'render': process.stdout.write(renderAutomatic(root, option('--period') ?? 'today', option('--session') ?? process.env.CODEX_THREAD_ID).markdown); break;
+    case 'render': {
+      initialize(root);
+      const period = evidencePeriod(root); const session = option('--session') ?? process.env.CODEX_THREAD_ID;
+      const history = config(root).historyImport && !args.includes('--no-history') ? await syncHistory(root, period, session) : undefined;
+      process.stdout.write(renderAutomatic(root, history?.period ?? period, session).markdown); break;
+    }
     case 'exit': {
       const session = option('--session') ?? process.env.CODEX_THREAD_ID; if (!session) throw new Error('Pass --session');
       const start = performance.now(); output({ paths: saveExit(root, session), elapsedMs: performance.now() - start }); break;
     }
     case 'uninstall': output(uninstall(root)); break;
-    case 'help': process.stdout.write(`Did Stuff v0.1.0 — You did stuff. Here’s what.\n\nLocal helpers (no model API):\n  install [--hooks] [--timezone Area/City] [--project PATH]\n  init | config | doctor | enable | disable | uninstall\n  configure [--capture true|false] [--exit-recap true|false]\n            [--timezone Area/City] [--language English] [--output .did-stuff/drafts]\n  evidence --format recap|standup|tweet --period today|yesterday|YYYY-MM-DD|session [--session ID]\n  record --session ID --from visible-note.json\n  save --from draft.json\n  render --period today (deterministic captured notes only)\n  capture --from hook.json | exit --session ID\n\nAgent-powered writing: invoke $did-stuff in Codex, not a terminal recap command.\n`); break;
+    case 'help': process.stdout.write(`Did Stuff v0.1.0 — You did stuff. Here’s what.\n\nLocal helpers (no model API):\n  install [--hooks] [--timezone Area/City] [--project PATH]\n  init | config | doctor | enable | disable | uninstall\n  configure [--capture true|false] [--exit-recap true|false] [--history true|false]\n            [--timezone Area/City] [--language English] [--output .did-stuff/drafts]\n  history [--period all|today|yesterday|YYYY-MM-DD|session] [--session ID]\n  evidence --format recap|standup|tweet --period today|yesterday|YYYY-MM-DD|session [--session ID] [--no-history]\n  record --session ID --from visible-note.json\n  save --from draft.json\n  render --period today [--no-history] (deterministic notes)\n  capture --from hook.json | exit --session ID\n\nEvidence and render sync local project history by default. Exit hooks never scan history.\nAgent-powered writing: invoke $did-stuff in Codex, not a terminal recap command.\n`); break;
     default: throw new Error('Unknown helper command; use did-stuff help');
   }
 } catch (error) { process.stderr.write(`Did Stuff: ${(error as Error).message}\n`); process.exitCode = 1; }

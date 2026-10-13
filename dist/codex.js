@@ -2,7 +2,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { excerpt, hash, MARKER, projectId, saveActivity, storage, atomicWrite, redact } from './core.js';
 export function summaryRequest(text) {
-    return /\$did-stuff\b|did[- ]stuff.*(?:recap|standup|tweet|summar|update)|(?:recap|standup|tweet|summar).*did[- ]stuff/i.test(text);
+    // Match an invocation, not a development task that quotes the skill's usage.
+    return /^\s*\$did-stuff(?::did-stuff)?(?:\s|$)/i.test(text)
+        || /^\s*(?:please\s+)?(?:use|run|invoke)\s+(?:the\s+)?did[- ]stuff\b[^\n]{0,160}\b(?:recap|standup|tweet|summar\w*|update)/i.test(text)
+        || /^\s*(?:please\s+)?(?:recap|standup|tweet|summar\w*)\b[^\n]{0,160}\b(?:with|using)\s+did[- ]stuff\b/i.test(text);
+}
+export function generatedSummary(text) {
+    return text.includes(MARKER) || /^\s*(?:#{1,6}\s+)?Did Stuff (?:recap|standup|tweet)(?:\s|$)/i.test(text)
+        || (/^\s*(?:Saved|No captured activity found)\b/i.test(text) && text.includes('.did-stuff/drafts'));
 }
 function suppressionFile(root, session, turn) {
     return path.join(storage(root), 'suppressed', hash(session + '\0' + turn) + '.json');
@@ -34,7 +41,7 @@ export function normalizeHook(root, input, now = new Date()) {
     else if (p.hook_event_name === 'Stop') {
         if (typeof p.last_assistant_message !== 'string' || !p.last_assistant_message.trim())
             return null;
-        if (p.last_assistant_message.includes(MARKER) || /(?:\.did-stuff\/drafts|did-stuff draft|Did Stuff (?:recap|standup|tweet))/i.test(p.last_assistant_message))
+        if (generatedSummary(p.last_assistant_message))
             return null;
         if (turn && fs.existsSync(suppressionFile(root, session, turn)))
             return null;

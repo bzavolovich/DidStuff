@@ -9,11 +9,12 @@ export type Outcome = 'reported' | 'observed' | 'failed' | 'request';
 export interface Activity {
   schemaVersion: 1; id: string; sourceAgent: 'codex'; projectId: string;
   sessionId: string; turnId?: string; activityAt: string; capturedAt: string;
-  timeBasis: 'activity' | 'capture'; kind: 'assistant' | 'request' | 'tool';
+  timeBasis: 'activity' | 'capture' | 'turn'; kind: 'assistant' | 'request' | 'tool';
+  origin?: 'history';
   description: string; evidence: string[]; outcome: Outcome;
 }
 export interface Config {
-  schemaVersion: 1; automaticCapture: boolean; automaticRecap: boolean;
+  schemaVersion: 1; automaticCapture: boolean; automaticRecap: boolean; historyImport: boolean;
   timezone: string; language: string; outputDirectory: string;
 }
 export const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -67,13 +68,14 @@ export function atomicWrite(file: string, content: string, exclusive = false): b
 }
 export function jsonRead(file: string): unknown { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 export function defaultConfig(): Config {
-  return { schemaVersion: 1, automaticCapture: false, automaticRecap: false,
+  return { schemaVersion: 1, automaticCapture: false, automaticRecap: false, historyImport: true,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: 'English', outputDirectory: '.did-stuff/drafts' };
 }
 export function validateConfig(value: unknown): Config {
-  const c = value as Config;
+  const c = { ...value as Config };
+  if (!Object.hasOwn(c, 'historyImport')) c.historyImport = true;
   if (!c || c.schemaVersion !== 1 || typeof c.automaticCapture !== 'boolean' || typeof c.automaticRecap !== 'boolean'
-    || typeof c.timezone !== 'string' || typeof c.language !== 'string' || !c.language.trim()
+    || typeof c.historyImport !== 'boolean' || typeof c.timezone !== 'string' || typeof c.language !== 'string' || !c.language.trim()
     || typeof c.outputDirectory !== 'string') throw new Error('Invalid configuration');
   new Intl.DateTimeFormat('en', { timeZone: c.timezone });
   const output = path.normalize(c.outputDirectory);
@@ -133,7 +135,7 @@ export function validActivity(a: unknown, root: string): a is Activity {
     && typeof e.id === 'string' && /^[a-f0-9]{64}$/.test(e.id) && typeof e.sessionId === 'string'
     && ['assistant', 'tool', 'request'].includes(e.kind) && ['reported', 'observed', 'failed', 'request'].includes(e.outcome)
     && typeof e.description === 'string' && e.description.length <= 6000 && Array.isArray(e.evidence)
-    && e.evidence.every(x => typeof x === 'string') && ['activity', 'capture'].includes(e.timeBasis)
+    && e.evidence.every(x => typeof x === 'string') && ['activity', 'capture', 'turn'].includes(e.timeBasis)
     && Number.isFinite(Date.parse(e.activityAt)) && Number.isFinite(Date.parse(e.capturedAt));
 }
 export function readActivities(root: string, deadline = Infinity): { activities: Activity[]; limited: boolean; invalid: number } {

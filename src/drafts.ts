@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Activity, atomicWrite, config, excerpt, hash, localDate, MARKER, periodDate, projectId,
   readActivities, redact, requireIgnored, storage, withLock } from './core.js';
+import { readHistoryReport } from './history.js';
 
 export type Format = 'recap' | 'standup' | 'tweet';
 export function formatName(value: string): Format {
@@ -16,12 +17,17 @@ export function select(root: string, period: string, session?: string, deadline 
   const resolved = period === 'session' ? 'session' : periodDate(period, c.timezone);
   const activities = read.activities.filter(a => period === 'session' ? a.sessionId === session : localDate(a.activityAt, c.timezone) === resolved);
   const captureTimes = activities.map(a => a.capturedAt).sort();
+  const history = readHistoryReport(root);
+  const matchingHistory = history && (history.period === 'all' || (history.period === resolved && (resolved !== 'session' || history.sessionId === session)));
   return { ...read, activities, period: resolved, timezone: c.timezone, language: c.language,
-    coverage: period === 'session' ? 'Current session only' : 'Captured sessions for the requested period',
+    coverage: period === 'session' ? 'Current session only' : 'Captured and imported project sessions for the requested period',
     limitations: [
-      'Only captured Codex activity and explicitly supplied visible context; no historical sessions imported.',
+      'Only captured Codex activity, imported local project history and explicitly supplied visible context; not a complete record of work.',
+      ...(!c.historyImport ? ['Automatic history sync is disabled; previously imported evidence remains available.'] : []),
+      ...(matchingHistory ? [`History sync ${history.status} at ${history.syncedAt}.`, ...history.limitations] : ['No history sync result is available for this selection.']),
       ...(activities.length ? [`Capture spans ${captureTimes[0]} to ${captureTimes.at(-1)}; this is not complete-day coverage.`] : []),
       ...(activities.some(a => a.timeBasis === 'capture') ? ['Some activity is dated by capture time; original message timestamps were unavailable.'] : []),
+      ...(activities.some(a => a.timeBasis === 'turn') ? ['Imported requests use turn start time; assistant reports and command results use turn completion time. Per-item timestamps are unavailable.'] : []),
       ...(read.limited ? ['Read budget reached; coverage is incomplete. Narrow the period or archive older evidence manually.'] : []),
       ...(read.invalid ? [`${read.invalid} unreadable or unsupported activity records skipped.`] : []),
       'Assistant reports are not independently verified. A zero command exit code only verifies that command’s exit status.'
@@ -60,7 +66,7 @@ export function saveManual(root: string, value: unknown) {
   const sources = selection.activities.filter(a => sourceIds.includes(a.id));
   if (sources.length !== new Set(sourceIds).size) throw new Error('Source IDs must belong to this project and requested period');
   let content: string;
-  if (!selection.activities.length) content = 'No captured activity found. Capture was disabled, not yet installed, or no visible work was recorded for this period. Existing changes do not establish dated accomplishments.';
+  if (!selection.activities.length) content = 'No captured activity found. No eligible captured or imported activity is available for this period. Check history sync coverage and limitations above. Existing changes do not establish dated accomplishments.';
   else if (format === 'tweet') {
     if (!Array.isArray(input.posts) || input.posts.length !== 3 || input.posts.some(p => typeof p !== 'string' || !p.trim())) throw new Error('Provide three tweet drafts in posts');
     const angles = ['Progress', 'Lesson', 'Problem solved'];

@@ -1,3 +1,9 @@
+# History import verification (unreleased)
+
+The new importer was exercised against local Codex CLI 0.162.1 on macOS with this project's real stored sessions. `history --period today` read three project threads and imported 43 eligible records, including reported work, requests, successful command exits and failed command exits. It skipped 24 items without original turn timestamps on the first scan. A repeat scan imported zero records and recognized all 43 duplicates. No stored thread was resumed and no inference turn was started. A sandboxed attempt could not access app-server state and correctly returned `unavailable`; the normal-permission run succeeded.
+
+History fixture tests cover active/archive pagination, project and nested-repository isolation, resumed sessions and local midnight, duplicate imports and hook overlap, later appended turns, failed commands, redaction, generated-summary and reasoning exclusion, missing dates, active/forked threads, unavailable hosts, malformed pagination, source-bound saving, old configuration defaults and opt-out behavior. The bundled helper is also exercised end-to-end against a stdio protocol fixture. Per-item timestamps, spawned subagents, copied fork history and remote-only sessions are outside this adapter's coverage.
+
 # v0.1.0 verification
 
 Environment: macOS, Node 22.17.0, npm 10.9.2, Codex CLI **0.162.1**, 2026-10-13. Existing Codex authentication was used; Did Stuff has no API-key configuration. No personal session history or credentials are included in release artifacts.

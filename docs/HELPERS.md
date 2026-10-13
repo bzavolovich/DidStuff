@@ -1,6 +1,18 @@
 # Local helper contracts
 
-All commands run with the current project as cwd or explicit `--project PATH`. `config` and `doctor` inspect active locations. `init` ensures ignored storage; automatic flags initially default false. Exit helpers run only when exit saving is enabled. Manual record/save remain usable with hooks disabled.
+All commands run with the current project as cwd or explicit `--project PATH`. `config` and `doctor` inspect active locations. `init` ensures ignored storage; hook automation initially defaults false and `historyImport` defaults true (also for older configuration files). Exit helpers run only when exit saving is enabled. Manual record/save and history remain usable with hooks disabled.
+
+## Historical sessions
+
+`history [--period all|today|yesterday|YYYY-MM-DD|session] [--session ID]` imports available local Codex history into ignored project activity. The default is `all`. It starts a local `codex app-server`, initializes the protocol, pages active and archived `thread/list` results and reads eligible threads with `thread/read`. No thread is resumed and no model turn is started. Codex must be on PATH and able to access its local state under its normal permissions and `CODEX_HOME`.
+
+Thread metadata is used to match the canonical project root, including existing subdirectories. Nested repositories and other worktrees are separate projects. Unrelated thread contents are never requested. Forked threads (which contain copied history), spawned subagents, active turns, undated items, hidden reasoning, raw tool output and attachments are excluded. Deleted, moved or remote-only sessions may be unavailable. Assistant reports remain unverified; a structured command exit code establishes only that command's exit status.
+
+Historical requests use turn start time, and final assistant messages/command results use turn completion time. This preserves resumed-session dates, but a turn spanning midnight has no finer item timestamps. Repeated imports and matching hook captures deduplicate by source identity and redacted content. Imports rescan eligible threads to pick up appended turns and retry previously unreadable ones. Unknown or unreadable data is reported; existing evidence is retained.
+
+The JSON result includes resolved `period`, `status` (`complete`, `partial`, `unavailable`), `threadsRead`, `imported`, `duplicates`, skipped counts and `limitations`. `complete` describes the scan, not complete-day coverage. The latest result is stored in `.did-stuff/history/latest.json` and shown by `doctor`. Explicit `history` exits nonzero on partial/unavailable reads. Each request has a 15-second timeout; scanning stops between requests after 45 seconds. Oversized responses above 32 MiB are rejected with a limitation.
+
+`configure --history false` disables automatic sync; `configure --history true` re-enables it. Explicit `history` still works when auto-sync is off. `disable` controls hooks and exit recaps only. No history work runs in lifecycle hooks.
 
 ## Capture
 
@@ -16,7 +28,7 @@ Omit activityAt when unknown. Manual descriptions always remain reported; a refe
 
 ## Gather and save
 
-`evidence --format recap|standup|tweet --period today|yesterday|YYYY-MM-DD|session [--session ID]` returns activities, resolved period, timezone, language, coverage, limitations, and supporting Git context. It does not write prose or start an agent. It does not import historical sessions. A period filters each activity timestamp in the configured timezone.
+`evidence --format recap|standup|tweet --period today|yesterday|YYYY-MM-DD|session [--session ID] [--no-history]` initializes missing configuration and syncs history for the requested selection by default. It returns activities, resolved period, timezone, language, coverage, limitations, history sync result, and supporting Git context. It does not write prose or start an agent. If history is unavailable, existing evidence is still returned with that limitation. A period filters each activity timestamp in the configured timezone. `--no-history` skips the sync without hiding previously imported evidence.
 
 `save --from draft.json` validates full source IDs against the project and requested period:
 
@@ -28,4 +40,4 @@ For session periods include `"sessionId":"actual-id"`. Optionally include `langu
 
 Successful save returns `path`, `draftId`, `markdown`, `coverage`, and `limitations`. Markdown and a JSON sidecar carry provenance; sources stay separate from public text. Empty selections always save a “No captured activity found” result. Files are unique and never overwrite earlier manual drafts.
 
-`render --period PERIOD` prints a deterministic recap of captured notes without a model. `exit --session ACTUAL_ID` exercises the same bounded saver as SessionEnd and reports elapsed milliseconds. Neither helper claims to create polished agent-powered prose.
+`render --period PERIOD [--no-history]` syncs history by default and prints a deterministic recap without a model. `exit --session ACTUAL_ID` exercises the same bounded saver as SessionEnd and reports elapsed milliseconds, without syncing history. Neither helper claims to create polished agent-powered prose.
