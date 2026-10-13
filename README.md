@@ -2,7 +2,7 @@
 
 **You did stuff. Here’s what.**
 
-![alt text](image.png)
+![alt text](image-1.png)
 
 An open-source Codex plugin and agent skill for daily work summaries, standup updates, and tweet drafts. Automatically imports past local project sessions, including archived sessions—no prior capture setup needed.
 
